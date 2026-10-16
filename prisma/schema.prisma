@@ -1,0 +1,136 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+// Note: SQLite doesn't support native Enums. 
+// We define the role as a String and enforce the "PLAYER" | "OWNER" | "ADMIN" values at the application level.
+// If you switch to PostgreSQL later, you can use: enum Role { PLAYER OWNER ADMIN }
+
+model User {
+  id               String    @id @default(cuid())
+  name             String
+  username         String?   @unique
+  email            String?   @unique
+  emailVerified    DateTime?
+  password         String?
+  verificationCode String?
+  codeExpiry       DateTime?
+  
+  // New SaaS Fields
+  role        String    @default("PLAYER") // "PLAYER", "OWNER", "ADMIN"
+  avatar      String?
+  image       String?
+  telegram    String?
+  instagram   String?
+  age         Int?
+  height      Int?      // in cm
+  weight      Int?      // in kg
+  footcoins   Int       @default(0)
+  
+  stadiums    Stadium[] 
+  bookings    Booking[] 
+  accounts    Account[]
+  sessions    Session[]
+  
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+}
+
+model Stadium {
+  id          String    @id @default(cuid())
+  name        String
+  description String?
+  address     String
+  lat         Float
+  lng         Float
+  hourlyPrice Float
+  openingTime String    
+  closingTime String    
+  
+  ownerId     String
+  owner       User      @relation(fields: [ownerId], references: [id])
+  
+  bookings    Booking[]
+  
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+}
+
+model Booking {
+  id          String    @id @default(cuid())
+  
+  stadiumId   String
+  stadium     Stadium   @relation(fields: [stadiumId], references: [id])
+  
+  userId      String
+  user        User      @relation(fields: [userId], references: [id])
+  
+  startTime   DateTime
+  endTime     DateTime
+  
+  status      String    @default("PENDING")
+  expiresAt   DateTime  
+  
+  payment     Payment?
+  
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+}
+
+model Payment {
+  id            String    @id @default(cuid())
+  
+  bookingId     String    @unique
+  booking       Booking   @relation(fields: [bookingId], references: [id], onDelete: Cascade)
+  
+  amount        Float
+  provider      String
+  status        String    @default("PENDING")
+  
+  transactionId String? 
+  
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+}
+
+
+// NextAuth Required Models
+model Account {
+  id                 String  @id @default(cuid())
+  userId             String
+  type               String
+  provider           String
+  providerAccountId  String
+  refresh_token      String?  
+  access_token       String?  
+  expires_at         Int?
+  token_type         String?
+  scope              String?
+  id_token           String?  
+  session_state      String?
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([provider, providerAccountId])
+}
+
+model Session {
+  id           String   @id @default(cuid())
+  sessionToken String   @unique
+  userId       String
+  expires      DateTime
+  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model VerificationToken {
+  identifier String
+  token      String   @unique
+  expires    DateTime
+
+  @@unique([identifier, token])
+}
